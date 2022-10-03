@@ -1,5 +1,7 @@
 import express from 'express';
 import pg from 'pg';
+import joi from 'joi';
+import dayjs from 'dayjs';
 
 const {Pool} = pg;
 
@@ -20,10 +22,30 @@ const connection = new Pool({
 const app = express();
 app.use(express.json());
 
+// Schemas
+
+const categoriesSchema = joi.object({
+    name: joi.string().min(1).required()
+});
+
+const gamesSchema = joi.object({
+    name: joi.string().min(1).required(),
+    stockTotal: joi.number().min(1).required(),
+    pricePerDay: joi.number().min(1).required(),
+    categoryId: joi.number().required(),
+});
+
+const customersSchema = joi.object({
+    name: joi.string().min(1).required(),
+    phone: joi.string().min(10).max(11).required(),
+    cpf: joi.string().min(11).max(11).required(),
+    birthday: joi.string().required()    
+});
 
 
 
-// Fazer os joi
+
+// Fazer as validations do schema
 
 // Passar as conexoes pra dentro do try
 
@@ -233,18 +255,70 @@ app.put('/customers/:id', async (req, res) => {
     };
 });
 
-
-
-
 // Rota rentals
 
-////////
+app.get('/rentals', async (req, res) => {
 
+    // Incompleto
 
-/* const query = connection.query('SELECT * FROM customers;'); */
+    let filterCustomerId = req.query.customerId;
+    let filterGameId = req.query.gameId;
 
-/* query.then(result => {
-    console.log(result.rows);
-}); */
+    try {
+
+    if(filterCustomerId){
+
+        connection.query(`SELECT * FROM rentals WHERE customerId = $1;`,[filterCustomerId]).then(rent => {
+        res.send(rent.rows)
+        }) 
+        return
+    }
+
+    if(filterGameId){
+
+        connection.query(`SELECT * FROM rentals WHERE gameId = $1;`,[filterGameId]).then(rent => {
+        res.send(rent.rows)
+        }) 
+        return
+    }
+
+    connection.query('SELECT * FROM customers').then(cust => {
+    res.send(cust.rows)}) 
+
+    } catch(err) {
+
+        res.status(500).send(err.message)
+
+    };
+
+});
+
+app.post('/rentals', async (req, res) => {
+
+    const rentDate = dayjs(Date.now()).format("YYYY-MM-DD");
+
+    let pricePerDay = 2000;
+    // Fazer o originalPrice = daysRented * pricePerDay
+    // pricePerDay deve vir da tabela games, de acordo com o gameId e o id
+
+    const {customerId, gameId, daysRented} = req.body;
+
+    const originalPrice = daysRented * pricePerDay
+
+    try {
+
+    connection.query(`INSERT INTO rentals ("customerId", "gameId", "rentDate", "daysRented", "returnDate", "originalPrice", "delayFee") VALUES ($1, $2, $3, $4, $5, $6, $7);`,[customerId, gameId, rentDate, daysRented, null, originalPrice, null])
+
+    res.sendStatus(201)
+
+    } catch(err) {
+
+        res.status(500).send(err.message)
+
+    };
+
+});
+
+///////////
 
 app.listen(4000, ()=>{console.log("Server running on port 4000")});
